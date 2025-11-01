@@ -1,9 +1,16 @@
+import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from app.database import create_db_and_tables
 from app.routers import contacts
+
+load_dotenv()
 
 
 @asynccontextmanager
@@ -14,9 +21,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Address Book API", lifespan=lifespan)
 
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+templates = Jinja2Templates(directory="app/templates")
+
 app.include_router(contacts.router)
 
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to the Address Book API"}
+@app.get("/", response_class=HTMLResponse)
+def read_root(request: Request):
+    return templates.TemplateResponse(request, "index.html")
+
+
+@app.get("/api/config")
+def get_config():
+    return {"google_api_key": os.getenv("GOOGLE_API_KEY")}

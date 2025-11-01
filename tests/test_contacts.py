@@ -4,7 +4,8 @@ from fastapi.testclient import TestClient
 def test_read_root(client: TestClient):
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "Welcome to the Address Book API"}
+    assert "text/html" in response.headers["content-type"]
+    assert "Address Book" in response.text
 
 
 def test_create_contact(client: TestClient):

@@ -12,7 +12,7 @@ uv sync
 ## Run
 
 ```bash
-uv run main.py
+uv run run.py
 ```
 
 API will be available at `http://localhost:8000`

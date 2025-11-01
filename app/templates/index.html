@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,12 +8,15 @@
     <style>
         .pac-container { z-index: 10000; }
         tbody tr { cursor: pointer; }
-        tbody tr:hover { background-color: #f8f9fa; }
+        tbody tr:hover { background-color: rgba(255, 255, 255, 0.075); }
         .member-row { margin-bottom: 8px; }
         .member-row:last-child { margin-bottom: 0; }
+        .card-header { background-color: rgba(13, 110, 253, 0.15); border-bottom: 1px solid rgba(13, 110, 253, 0.3); }
+        .btn-primary { background-color: #0d6efd; border-color: #0d6efd; }
+        .btn-primary:hover { background-color: #0b5ed7; border-color: #0a58ca; }
     </style>
 </head>
-<body>
+<body class="bg-dark">
     <div class="container mt-5">
         <h1 class="mb-4">Address Book</h1>
 
@@ -39,7 +42,9 @@
 
                     <div id="membersContainer"></div>
 
-                    <button type="submit" class="d-none"></button>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-success">Add Household</button>
+                    </div>
                 </form>
             </div>
         </div>

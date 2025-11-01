@@ -3,37 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Address Book</title>
+    <title>Address Book - Households</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .pac-container { z-index: 10000; }
         tbody tr { cursor: pointer; }
         tbody tr:hover { background-color: #f8f9fa; }
+        .member-row { margin-bottom: 8px; }
+        .member-row:last-child { margin-bottom: 0; }
     </style>
 </head>
 <body>
     <div class="container mt-5">
         <h1 class="mb-4">Address Book</h1>
 
-        <!-- Add Contact Form -->
-        <form id="addContactForm" class="mb-4">
-            <div class="row g-2">
-                <div class="col">
-                    <input type="text" class="form-control" id="address" placeholder="Address" required>
-                </div>
-                <div class="col">
-                    <input type="text" class="form-control" id="firstName" placeholder="First Name" required>
-                </div>
-                <div class="col">
-                    <input type="text" class="form-control" id="lastName" placeholder="Last Name" required>
-                </div>
+        <!-- Add Household Form -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Add Household</h5>
             </div>
-            <button type="submit" class="d-none"></button>
-        </form>
+            <div class="card-body">
+                <form id="addHouseholdForm">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <input type="text" class="form-control" id="householdName" placeholder="Household Name (e.g., The Lofreso's)" required>
+                        </div>
+                        <div class="col-md-6">
+                            <input type="text" class="form-control" id="householdAddress" placeholder="Address" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">Members:</label>
+                    </div>
+
+                    <div id="membersContainer"></div>
+
+                    <button type="submit" class="d-none"></button>
+                </form>
+            </div>
+        </div>
 
         <!-- Search and Pagination Controls -->
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <input type="text" class="form-control w-50" id="searchBox" placeholder="Search contacts...">
+            <input type="text" class="form-control w-50" id="searchBox" placeholder="Search households...">
             <select class="form-select w-auto" id="perPage">
                 <option value="20" selected>20 per page</option>
                 <option value="50">50 per page</option>
@@ -42,15 +55,16 @@
             </select>
         </div>
 
-        <!-- Contacts Table -->
+        <!-- Households Table -->
         <table class="table table-hover">
             <thead>
                 <tr>
-                    <th>Name</th>
+                    <th>Household Name</th>
                     <th>Address</th>
+                    <th>Members</th>
                 </tr>
             </thead>
-            <tbody id="contactsTable"></tbody>
+            <tbody id="householdsTable"></tbody>
         </table>
 
         <!-- Pagination -->
@@ -59,30 +73,34 @@
         </nav>
     </div>
 
-    <!-- Edit Modal -->
+    <!-- Edit Household Modal -->
     <div class="modal fade" id="editModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Edit Contact</h5>
+                    <h5 class="modal-title">Edit Household</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="editContactForm">
+                    <form id="editHouseholdForm">
                         <input type="hidden" id="editId">
                         <div class="mb-3">
-                            <input type="text" class="form-control" id="editAddress" placeholder="Address">
+                            <label class="form-label">Household Name</label>
+                            <input type="text" class="form-control" id="editHouseholdName" placeholder="Household Name">
                         </div>
                         <div class="mb-3">
-                            <input type="text" class="form-control" id="editFirstName" placeholder="First Name">
+                            <label class="form-label">Address</label>
+                            <input type="text" class="form-control" id="editHouseholdAddress" placeholder="Address">
                         </div>
                         <div class="mb-3">
-                            <input type="text" class="form-control" id="editLastName" placeholder="Last Name">
+                            <label class="form-label fw-bold">Members</label>
+                            <div id="editMembersContainer"></div>
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="addMemberBtn">+ Add Member</button>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-danger" id="deleteBtn">Delete</button>
+                    <button type="button" class="btn btn-danger" id="deleteBtn">Delete Household</button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="saveEditBtn">Save</button>
                 </div>
@@ -95,10 +113,12 @@
         let editModal;
         let autocomplete;
         let editAutocomplete;
-        let allContacts = [];
-        let filteredContacts = [];
+        let allHouseholds = [];
+        let filteredHouseholds = [];
         let currentPage = 1;
         let perPage = 20;
+        let memberCounter = 0;
+        let currentHouseholdId = null;
 
         // Fetch API key and initialize
         async function init() {
@@ -126,58 +146,115 @@
             };
 
             autocomplete = new google.maps.places.Autocomplete(
-                document.getElementById('address'),
+                document.getElementById('householdAddress'),
                 options
             );
 
             editAutocomplete = new google.maps.places.Autocomplete(
-                document.getElementById('editAddress'),
+                document.getElementById('editHouseholdAddress'),
                 options
             );
 
-            loadContacts();
+            initializeMemberRows();
+            loadHouseholds();
         }
 
-        async function loadContacts() {
-            const response = await fetch('/contacts/');
-            allContacts = await response.json();
+        function initializeMemberRows() {
+            // Start with 2 member rows
+            for (let i = 0; i < 2; i++) {
+                addMemberRow();
+            }
+        }
+
+        function addMemberRow() {
+            const container = document.getElementById('membersContainer');
+            const rowId = `member-${memberCounter++}`;
+
+            const row = document.createElement('div');
+            row.className = 'row g-2 member-row';
+            row.id = rowId;
+            row.innerHTML = `
+                <div class="col-md-6">
+                    <input type="text" class="form-control member-first-name" placeholder="First Name" data-row="${rowId}">
+                </div>
+                <div class="col-md-6">
+                    <input type="text" class="form-control member-last-name" placeholder="Last Name" data-row="${rowId}">
+                </div>
+            `;
+
+            container.appendChild(row);
+
+            // Add event listeners for keyboard-friendly member addition
+            const firstName = row.querySelector('.member-first-name');
+            const lastName = row.querySelector('.member-last-name');
+
+            firstName.addEventListener('input', checkIfShouldAddRow);
+            lastName.addEventListener('input', checkIfShouldAddRow);
+            lastName.addEventListener('keydown', (e) => {
+                if (e.key === 'Tab' && !e.shiftKey) {
+                    checkIfShouldAddRow();
+                }
+            });
+        }
+
+        function checkIfShouldAddRow() {
+            const container = document.getElementById('membersContainer');
+            const rows = container.querySelectorAll('.member-row');
+            const lastRow = rows[rows.length - 1];
+            const lastFirstName = lastRow.querySelector('.member-first-name').value;
+            const lastLastName = lastRow.querySelector('.member-last-name').value;
+
+            // If user has typed in the last row, add a new row
+            if (lastFirstName || lastLastName) {
+                addMemberRow();
+            }
+        }
+
+        async function loadHouseholds() {
+            const response = await fetch('/households/');
+            allHouseholds = await response.json();
             filterAndRender();
         }
 
         function filterAndRender() {
             const searchTerm = document.getElementById('searchBox').value.toLowerCase();
-            filteredContacts = allContacts.filter(contact => {
-                const fullName = `${contact.first_name} ${contact.last_name}`.toLowerCase();
-                const address = (contact.address || '').toLowerCase();
-                return fullName.includes(searchTerm) || address.includes(searchTerm);
+            filteredHouseholds = allHouseholds.filter(household => {
+                const name = household.name.toLowerCase();
+                const address = (household.address || '').toLowerCase();
+                const memberNames = household.members.map(m => `${m.first_name} ${m.last_name}`.toLowerCase()).join(' ');
+                return name.includes(searchTerm) || address.includes(searchTerm) || memberNames.includes(searchTerm);
             });
 
             currentPage = 1;
-            renderContacts();
+            renderHouseholds();
             renderPagination();
         }
 
-        function renderContacts() {
+        function renderHouseholds() {
             const start = (currentPage - 1) * perPage;
-            const end = perPage === 999999 ? filteredContacts.length : start + perPage;
-            const pageContacts = filteredContacts.slice(start, end);
+            const end = perPage === 999999 ? filteredHouseholds.length : start + perPage;
+            const pageHouseholds = filteredHouseholds.slice(start, end);
 
-            const tableBody = document.getElementById('contactsTable');
-            if (pageContacts.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="2" class="text-muted text-center">No contacts found</td></tr>';
+            const tableBody = document.getElementById('householdsTable');
+            if (pageHouseholds.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="3" class="text-muted text-center">No households found</td></tr>';
                 return;
             }
 
-            tableBody.innerHTML = pageContacts.map(contact => `
-                <tr onclick="editContact(${contact.id})">
-                    <td>${contact.first_name} ${contact.last_name}</td>
-                    <td>${contact.address || ''}</td>
-                </tr>
-            `).join('');
+            tableBody.innerHTML = pageHouseholds.map(household => {
+                const membersList = household.members.map(m => `${m.first_name} ${m.last_name}`).join(', ');
+                return `
+                    <tr onclick="editHousehold(${household.id})">
+                        <td>${household.name}</td>
+                        <td>${household.address || ''}</td>
+                        <td>${membersList || '<span class="text-muted">No members</span>'}</td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         function renderPagination() {
-            const totalPages = Math.ceil(filteredContacts.length / perPage);
+            const totalPages = Math.ceil(filteredHouseholds.length / perPage);
             const paginationEl = document.getElementById('pagination');
 
             if (totalPages <= 1 || perPage === 999999) {
@@ -212,10 +289,10 @@
         }
 
         function changePage(page) {
-            const totalPages = Math.ceil(filteredContacts.length / perPage);
+            const totalPages = Math.ceil(filteredHouseholds.length / perPage);
             if (page < 1 || page > totalPages) return;
             currentPage = page;
-            renderContacts();
+            renderHouseholds();
             renderPagination();
         }
 
@@ -226,33 +303,60 @@
             filterAndRender();
         });
 
-        document.getElementById('addContactForm').addEventListener('submit', async (e) => {
+        document.getElementById('addHouseholdForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const contact = {
-                first_name: document.getElementById('firstName').value,
-                last_name: document.getElementById('lastName').value,
-                address: document.getElementById('address').value || null
-            };
+            // Collect member data
+            const memberRows = document.querySelectorAll('#membersContainer .member-row');
+            const members = [];
 
-            await fetch('/contacts/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(contact)
+            memberRows.forEach(row => {
+                const firstName = row.querySelector('.member-first-name').value.trim();
+                const lastName = row.querySelector('.member-last-name').value.trim();
+
+                // Only add members with at least a first or last name
+                if (firstName || lastName) {
+                    members.push({
+                        first_name: firstName || '',
+                        last_name: lastName || '',
+                        email: null,
+                        phone: null
+                    });
+                }
             });
 
+            const household = {
+                name: document.getElementById('householdName').value,
+                address: document.getElementById('householdAddress').value || '',
+                members: members
+            };
+
+            await fetch('/households/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(household)
+            });
+
+            // Reset form
             e.target.reset();
-            loadContacts();
+            document.getElementById('membersContainer').innerHTML = '';
+            memberCounter = 0;
+            initializeMemberRows();
+
+            loadHouseholds();
         });
 
-        async function editContact(id) {
-            const response = await fetch(`/contacts/${id}`);
-            const contact = await response.json();
+        async function editHousehold(id) {
+            currentHouseholdId = id;
+            const response = await fetch(`/households/${id}`);
+            const household = await response.json();
 
-            document.getElementById('editId').value = contact.id;
-            document.getElementById('editFirstName').value = contact.first_name || '';
-            document.getElementById('editLastName').value = contact.last_name || '';
-            document.getElementById('editAddress').value = contact.address || '';
+            document.getElementById('editId').value = household.id;
+            document.getElementById('editHouseholdName').value = household.name || '';
+            document.getElementById('editHouseholdAddress').value = household.address || '';
+
+            // Render members
+            renderEditMembers(household.members);
 
             if (!editModal) {
                 editModal = new bootstrap.Modal(document.getElementById('editModal'));
@@ -260,32 +364,115 @@
             editModal.show();
         }
 
-        document.getElementById('saveEditBtn').addEventListener('click', async () => {
-            const id = document.getElementById('editId').value;
-            const contact = {
-                first_name: document.getElementById('editFirstName').value || null,
-                last_name: document.getElementById('editLastName').value || null,
-                address: document.getElementById('editAddress').value || null
-            };
+        function renderEditMembers(members) {
+            const container = document.getElementById('editMembersContainer');
+            container.innerHTML = members.map((member, index) => `
+                <div class="row g-2 mb-2 edit-member-row" data-member-id="${member.id}">
+                    <div class="col-md-5">
+                        <input type="text" class="form-control edit-member-first-name" placeholder="First Name" value="${member.first_name || ''}">
+                    </div>
+                    <div class="col-md-5">
+                        <input type="text" class="form-control edit-member-last-name" placeholder="Last Name" value="${member.last_name || ''}">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-sm btn-danger w-100" onclick="removeMember(${member.id})">Remove</button>
+                    </div>
+                </div>
+            `).join('');
+        }
 
-            await fetch(`/contacts/${id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(contact)
+        document.getElementById('addMemberBtn').addEventListener('click', () => {
+            const container = document.getElementById('editMembersContainer');
+            const newRow = document.createElement('div');
+            newRow.className = 'row g-2 mb-2 edit-member-row';
+            newRow.dataset.memberNew = 'true';
+            newRow.innerHTML = `
+                <div class="col-md-5">
+                    <input type="text" class="form-control edit-member-first-name" placeholder="First Name">
+                </div>
+                <div class="col-md-5">
+                    <input type="text" class="form-control edit-member-last-name" placeholder="Last Name">
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-sm btn-secondary w-100" onclick="this.closest('.edit-member-row').remove()">Cancel</button>
+                </div>
+            `;
+            container.appendChild(newRow);
+        });
+
+        async function removeMember(memberId) {
+            if (!confirm('Are you sure you want to remove this member?')) return;
+
+            await fetch(`/households/${currentHouseholdId}/members/${memberId}`, {
+                method: 'DELETE'
             });
 
+            const household = await (await fetch(`/households/${currentHouseholdId}`)).json();
+            renderEditMembers(household.members);
+        }
+
+        document.getElementById('saveEditBtn').addEventListener('click', async () => {
+            const id = document.getElementById('editId').value;
+
+            // Update household details
+            const household = {
+                name: document.getElementById('editHouseholdName').value || null,
+                address: document.getElementById('editHouseholdAddress').value || null
+            };
+
+            await fetch(`/households/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(household)
+            });
+
+            // Update existing members and add new ones
+            const memberRows = document.querySelectorAll('#editMembersContainer .edit-member-row');
+
+            for (const row of memberRows) {
+                const firstName = row.querySelector('.edit-member-first-name').value.trim();
+                const lastName = row.querySelector('.edit-member-last-name').value.trim();
+
+                if (!firstName && !lastName) continue;
+
+                if (row.dataset.memberNew) {
+                    // Add new member
+                    await fetch(`/households/${id}/members`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            first_name: firstName || '',
+                            last_name: lastName || '',
+                            email: null,
+                            phone: null
+                        })
+                    });
+                } else {
+                    // Update existing member
+                    const memberId = row.dataset.memberId;
+                    await fetch(`/households/${id}/members/${memberId}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            first_name: firstName || null,
+                            last_name: lastName || null
+                        })
+                    });
+                }
+            }
+
             editModal.hide();
-            loadContacts();
+            loadHouseholds();
         });
 
         document.getElementById('deleteBtn').addEventListener('click', async () => {
-            if (!confirm('Are you sure you want to delete this contact?')) return;
+            if (!confirm('Are you sure you want to delete this household? All members will be removed.')) return;
 
             const id = document.getElementById('editId').value;
-            await fetch(`/contacts/${id}`, { method: 'DELETE' });
+            await fetch(`/households/${id}`, { method: 'DELETE' });
 
             editModal.hide();
-            loadContacts();
+            loadHouseholds();
         });
 
         init();

@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.database import create_db_and_tables
-from app.routers import contacts
+from app.routers import contacts, households
 
 load_dotenv()
 
@@ -25,6 +25,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
 app.include_router(contacts.router)
+app.include_router(households.router)
 
 
 @app.get("/", response_class=HTMLResponse)

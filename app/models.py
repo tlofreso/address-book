@@ -1,6 +1,12 @@
 from sqlmodel import Field, Relationship, SQLModel
 
 
+# Link table for many-to-many relationship between List and Household
+class ListHouseholdLink(SQLModel, table=True):
+    list_id: int = Field(foreign_key="list.id", primary_key=True)
+    household_id: int = Field(foreign_key="household.id", primary_key=True)
+
+
 # Household models
 class HouseholdBase(SQLModel):
     name: str
@@ -10,6 +16,7 @@ class HouseholdBase(SQLModel):
 class Household(HouseholdBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     members: list["Member"] = Relationship(back_populates="household", cascade_delete=True)
+    lists: list["List"] = Relationship(back_populates="households", link_model=ListHouseholdLink)
 
 
 class HouseholdCreate(HouseholdBase):
@@ -59,6 +66,36 @@ class HouseholdWithMembersCreate(HouseholdBase):
 class HouseholdRead(HouseholdBase):
     id: int
     members: list[MemberRead] = []
+
+
+# List models
+class ListBase(SQLModel):
+    name: str
+    description: str | None = None
+
+
+class List(ListBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    households: list[Household] = Relationship(back_populates="lists", link_model=ListHouseholdLink)
+
+
+class ListCreate(ListBase):
+    pass
+
+
+class ListUpdate(SQLModel):
+    name: str | None = None
+    description: str | None = None
+
+
+class ListRead(ListBase):
+    id: int
+    household_count: int = 0
+
+
+class ListWithHouseholds(ListBase):
+    id: int
+    households: list[HouseholdRead] = []
 
 
 # Legacy Contact models (keeping for backwards compatibility during migration)
